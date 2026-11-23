@@ -103,3 +103,38 @@ jobs:
           path: installers/*.dmg
           retention-days: 30
           compression-level: 0
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: orca-patched-macos-installers
+          path: installers
+
+      - name: Publish a release on the fork
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          short="${GITHUB_SHA::10}"
+          tag="patched-macos-$short"
+          cat > notes.md <<EOF
+          Patched Orca for macOS, built from \`$short\` on \`$GITHUB_REF_NAME\`.
+
+          Adds task groups with folders, the worktree chevron, child folders as projects, and the
+          Windows Claude model-list fix on top of upstream main.
+
+          **Which file:** \`Orca-patched-macos-arm64.dmg\` for Apple Silicon (M1 and later), \`Orca-patched-macos-x64.dmg\` for Intel.
+
+          **First launch:** this build is not notarized. Drag Orca to Applications, then run
+          \`xattr -dr com.apple.quarantine /Applications/Orca.app\` once (or right-click Orca, Open).
+          It replaces an official Orca install and does not auto-update.
+          EOF
+          sed -i 's/^          //' notes.md
+          gh release create "$tag" installers/*.dmg --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Orca patched for macOS ($short)" --notes-file notes.md --latest
