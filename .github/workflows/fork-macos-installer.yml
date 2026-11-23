@@ -1,0 +1,105 @@
+name: Fork macOS installer (unsigned)
+
+# Personal-fork build of the patched app: ad hoc signed, not notarized, no auto-update channel.
+# The orcad deployment template comes from the official release, as for the patched Windows install.
+
+on:
+  push:
+    branches: [build/macos-installer]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-macos-installer
+  cancel-in-progress: true
+
+env:
+  OFFICIAL_RELEASE: v1.4.272
+  ORCA_BACKGROUND_LAUNCH: '1'
+
+jobs:
+  build:
+    if: github.repository == 's4lmon778/orca'
+    runs-on: macos-15
+    timeout-minutes: 150
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            mobile/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --cpu=current,x64,arm64
+
+      - uses: ./.github/actions/install-mobile-dependencies
+
+      - name: Build app sources and macOS helpers
+        run: |
+          pnpm run build:desktop
+          pnpm run build:computer-macos
+          pnpm run build:keyboard-layout-macos
+          pnpm run build:process-footprint-macos
+          pnpm run build:notification-status-macos
+
+      - name: Take the orcad template from the official release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "$OFFICIAL_RELEASE" --repo stablyai/orca \
+            --pattern "Orca-${OFFICIAL_RELEASE#v}-arm64-mac.zip" --dir "$RUNNER_TEMP/official"
+          ditto -x -k "$RUNNER_TEMP/official/Orca-${OFFICIAL_RELEASE#v}-arm64-mac.zip" "$RUNNER_TEMP/official/app"
+          rm -rf out/orcad-template
+          ditto "$RUNNER_TEMP/official/app/Orca.app/Contents/Resources/orcad-template" out/orcad-template
+          ls out/orcad-template
+
+      - name: Package (dmg + zip, arm64 and x64)
+        run: |
+          pnpm run ensure:electron-runtime
+          node config/scripts/desktop-distribution/macos/build-mac-local.mjs
+
+      - name: Ad hoc seal each app and rebuild its dmg
+        run: |
+          set -euo pipefail
+          mkdir -p installers
+          for dir in dist/mac-arm64 dist/mac; do
+            app="$dir/Orca.app"
+            [ -d "$app" ] || continue
+            arch=$([ "$dir" = dist/mac-arm64 ] && echo arm64 || echo x64)
+            if ! codesign --verify --strict "$app" 2>/dev/null; then
+              codesign --force --sign - "$app" || codesign --force --deep --sign - "$app"
+            fi
+            codesign --verify --verbose=2 "$app"
+            stage="$RUNNER_TEMP/dmg-$arch"
+            rm -rf "$stage" && mkdir -p "$stage"
+            ditto "$app" "$stage/Orca.app"
+            ln -s /Applications "$stage/Applications"
+            hdiutil create -volname "Orca (patched)" -srcfolder "$stage" -ov -format UDZO \
+              "installers/Orca-patched-macos-$arch.dmg"
+          done
+          ls -la installers dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: orca-patched-macos-installers
+          path: installers/*.dmg
+          retention-days: 30
+          compression-level: 0
