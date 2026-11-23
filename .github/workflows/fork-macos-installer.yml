@@ -83,6 +83,11 @@ jobs:
             # Each slice verifies its template against its own agent-browser driver.
             rm -rf out/orcad-template
             ditto "$RUNNER_TEMP/official/$arch/Orca.app/Contents/Resources/orcad-template" out/orcad-template
+            # The official app already points the template at its own agent-browser; drop that so
+            # packaging references (and hashes) this build's driver instead.
+            jq '(.targets[] | select(.packagedBrowser == true)) |= del(.browserName, .browserSha256, .packagedBrowser)' \
+              out/orcad-template/orcad-template.json > "$RUNNER_TEMP/manifest.json"
+            mv "$RUNNER_TEMP/manifest.json" out/orcad-template/orcad-template.json
             pnpm exec electron-builder --config config/electron-builder.config.cjs --mac dir --$arch
             dir=$([ "$arch" = arm64 ] && echo dist/mac-arm64 || echo dist/mac)
             app="$dir/Orca.app"
