@@ -8624,6 +8624,9 @@
         "WorktreeCardTaskGroupsToggle": {
           "expand": "Show task groups",
           "collapse": "Hide task groups"
+        },
+        "WorktreeCardNewConversationButton": {
+          "label": "New Conversation"
         }
       },
       "shared": {
