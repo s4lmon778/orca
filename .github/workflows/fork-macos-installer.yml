@@ -88,7 +88,11 @@ jobs:
             jq '(.targets[] | select(.packagedBrowser == true)) |= del(.browserName, .browserSha256, .packagedBrowser)' \
               out/orcad-template/orcad-template.json > "$RUNNER_TEMP/manifest.json"
             mv "$RUNNER_TEMP/manifest.json" out/orcad-template/orcad-template.json
-            pnpm exec electron-builder --config config/electron-builder.config.cjs --mac dir --$arch
+            if ! pnpm exec electron-builder --config config/electron-builder.config.cjs --mac dir --$arch; then
+              # The Intel slice's terminal-host smoke runs under Rosetta on this arm64 runner and can fail there.
+              if [ "$arch" = x64 ]; then echo "::warning::Intel (x64) packaging failed; publishing Apple Silicon only"; continue; fi
+              exit 1
+            fi
             dir=$([ "$arch" = arm64 ] && echo dist/mac-arm64 || echo dist/mac)
             app="$dir/Orca.app"
             if ! codesign --verify --strict "$app" 2>/dev/null; then
