@@ -26,6 +26,19 @@ describe('buildWindowsCmdShimCommandLine', () => {
     }
   })
 
+  it('spells JSON quotes as \\" so a shim forwarding to Bun keeps the next flag separate', () => {
+    // Bun ends a quoted run at `""`; it turned --settings {"disableAllHooks":true} into one
+    // argument that swallowed `--setting-sources user` and failed the Claude model listing.
+    const line = buildWindowsCmdShimCommandLine('C:\\bin\\claude.cmd', [
+      '--settings',
+      '{"disableAllHooks":true}',
+      '--setting-sources',
+      'user'
+    ])
+    expect(line).toContain('"{\\"disableAllHooks\\":true}"')
+    expect(quoteParity(line)).toBe(0)
+  })
+
   it('breaks every percent out of the quoted run', () => {
     const line = buildWindowsCmdShimCommandLine('C:\\bin\\agent.cmd', ['e%F%g'])
     expect(line).toContain('"^%"')

@@ -35,8 +35,34 @@ export function quoteWindowsArgument(value: string): string {
   return quoteWindows(value, false)
 }
 
+// Whitespace and cmd's separators/operators; a value free of them is inert to cmd even where its quote counting leaves a run unquoted.
+const CMD_ACTIVE_OUTSIDE_QUOTES = /[\s&|<>^%!(),;=]/
+
+/** Writes each embedded quote as `\"`, the spelling every Windows argv parser decodes. */
+function quoteWindowsBackslashEscaped(value: string): string {
+  let quoted = '"'
+  let backslashes = 0
+  for (const char of value) {
+    if (char === '\\') {
+      backslashes += 1
+      continue
+    }
+    quoted +=
+      char === '"' ? `${'\\'.repeat(backslashes * 2 + 1)}"` : `${'\\'.repeat(backslashes)}${char}`
+    backslashes = 0
+  }
+  return `${quoted}${'\\'.repeat(backslashes * 2)}"`
+}
+
 // A separate function prevents Array.map indices from accidentally enabling percent escaping.
 export function quoteWindowsCmdArgument(value: string): string {
+  // Why: a shim's `%*` may forward to a parser (Bun) that ends the quoted run at `""`, so a
+  // `--settings {"…":true}` JSON value swallowed the following flags. `\"` decodes everywhere and is
+  // safe for cmd when the value has an even quote count (parity stays even) and nothing cmd acts on.
+  const quotes = value.split('"').length - 1
+  if (quotes > 0 && quotes % 2 === 0 && !CMD_ACTIVE_OUTSIDE_QUOTES.test(value)) {
+    return quoteWindowsBackslashEscaped(value)
+  }
   return quoteWindows(value, true)
 }
 
