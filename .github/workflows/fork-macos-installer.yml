@@ -59,31 +59,33 @@ jobs:
           pnpm run build:process-footprint-macos
           pnpm run build:notification-status-macos
 
-      - name: Take the orcad template from the official release
+      - name: Download the official apps (for their orcad templates)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          v="${OFFICIAL_RELEASE#v}"
           gh release download "$OFFICIAL_RELEASE" --repo stablyai/orca \
-            --pattern "Orca-${OFFICIAL_RELEASE#v}-arm64-mac.zip" --dir "$RUNNER_TEMP/official"
-          ditto -x -k "$RUNNER_TEMP/official/Orca-${OFFICIAL_RELEASE#v}-arm64-mac.zip" "$RUNNER_TEMP/official/app"
-          rm -rf out/orcad-template
-          ditto "$RUNNER_TEMP/official/app/Orca.app/Contents/Resources/orcad-template" out/orcad-template
-          ls out/orcad-template
+            --pattern "Orca-$v-arm64-mac.zip" --pattern "Orca-$v-mac.zip" --dir "$RUNNER_TEMP/official"
+          ditto -x -k "$RUNNER_TEMP/official/Orca-$v-arm64-mac.zip" "$RUNNER_TEMP/official/arm64"
+          ditto -x -k "$RUNNER_TEMP/official/Orca-$v-mac.zip" "$RUNNER_TEMP/official/x64"
+          ls "$RUNNER_TEMP/official"/*/Orca.app/Contents/Resources/orcad-template
 
-      - name: Package (dmg + zip, arm64 and x64)
-        run: |
-          pnpm run ensure:electron-runtime
-          node config/scripts/desktop-distribution/macos/build-mac-local.mjs
-
-      - name: Ad hoc seal each app and rebuild its dmg
+      - name: Package, ad hoc seal and make a dmg per architecture
         run: |
           set -euo pipefail
+          pnpm run ensure:electron-runtime
+          read -r ORCA_BUILD_COMMIT ORCA_LOCAL_BUILD_VERSION < <(node --input-type=module -e \
+            "import { getLocalBuildIdentity as g } from './config/scripts/desktop-distribution/macos/build-mac-local.mjs'; const i = g(); console.log(i.commit, i.version)")
+          export ORCA_BUILD_COMMIT ORCA_LOCAL_BUILD_VERSION
           mkdir -p installers
-          for dir in dist/mac-arm64 dist/mac; do
+          for arch in arm64 x64; do
+            # Each slice verifies its template against its own agent-browser driver.
+            rm -rf out/orcad-template
+            ditto "$RUNNER_TEMP/official/$arch/Orca.app/Contents/Resources/orcad-template" out/orcad-template
+            pnpm exec electron-builder --config config/electron-builder.config.cjs --mac dir --$arch
+            dir=$([ "$arch" = arm64 ] && echo dist/mac-arm64 || echo dist/mac)
             app="$dir/Orca.app"
-            [ -d "$app" ] || continue
-            arch=$([ "$dir" = dist/mac-arm64 ] && echo arm64 || echo x64)
             if ! codesign --verify --strict "$app" 2>/dev/null; then
               codesign --force --sign - "$app" || codesign --force --deep --sign - "$app"
             fi
