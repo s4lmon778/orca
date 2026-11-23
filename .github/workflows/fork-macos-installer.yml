@@ -140,12 +140,23 @@ jobs:
           Adds task groups with folders, the worktree chevron, child folders as projects, and the
           Windows Claude model-list fix on top of upstream main.
 
-          **Which file:** \`Orca-patched-macos-arm64.dmg\` for Apple Silicon (M1 and later), \`Orca-patched-macos-x64.dmg\` for Intel.
+          **Easiest install (Apple Silicon):** paste this into Terminal. It downloads, installs and opens Orca:
 
-          **First launch:** this build is not notarized. Drag Orca to Applications, then run
-          \`xattr -dr com.apple.quarantine /Applications/Orca.app\` once (or right-click Orca, Open).
+          \`\`\`
+          curl -fsSL https://raw.githubusercontent.com/s4lmon778/orca/build/macos-installer/.github/fork/install-orca-mac.sh | bash
+          \`\`\`
+
+          **Installing from the dmg instead:** this build is ad hoc signed, not notarized, so macOS says a
+          browser-downloaded copy "is damaged and can't be opened" (right-click Open does not help).
+          Drag Orca to Applications, then run this once in Terminal:
+
+          \`\`\`
+          xattr -dr com.apple.quarantine /Applications/Orca.app
+          \`\`\`
+
           It replaces an official Orca install and does not auto-update.
           EOF
+          ls installers/*x64* >/dev/null 2>&1 || echo "No Intel (x64) build this time: its packaging self-test failed on the runner." >> notes.md
           sed -i 's/^          //' notes.md
           gh release create "$tag" installers/*.dmg --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Orca patched for macOS ($short)" --notes-file notes.md --latest
