@@ -8627,6 +8627,10 @@
         },
         "WorktreeCardNewConversationButton": {
           "label": "New Conversation"
+        },
+        "AgentTaskGroupDestinationMenu": {
+          "branch": "No task group",
+          "addTo": "Add to: {{value0}}"
         }
       },
       "shared": {
