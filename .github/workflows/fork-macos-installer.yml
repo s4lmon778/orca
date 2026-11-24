@@ -23,6 +23,8 @@ jobs:
   build:
     if: github.repository == 's4lmon778/orca'
     runs-on: macos-15
+    outputs:
+      version: ${{ steps.package.outputs.version }}
     timeout-minutes: 150
     env:
       NODE_OPTIONS: --max-old-space-size=6144
@@ -72,12 +74,14 @@ jobs:
           ls "$RUNNER_TEMP/official"/*/Orca.app/Contents/Resources/orcad-template
 
       - name: Package, ad hoc seal and make a dmg per architecture
+        id: package
         run: |
           set -euo pipefail
           pnpm run ensure:electron-runtime
           read -r ORCA_BUILD_COMMIT ORCA_LOCAL_BUILD_VERSION < <(node --input-type=module -e \
             "import { getLocalBuildIdentity as g } from './config/scripts/desktop-distribution/macos/build-mac-local.mjs'; const i = g(); console.log(i.commit, i.version)")
           export ORCA_BUILD_COMMIT ORCA_LOCAL_BUILD_VERSION
+          echo "version=$ORCA_LOCAL_BUILD_VERSION" >> "$GITHUB_OUTPUT"
           mkdir -p installers
           for arch in arm64 x64; do
             # Each slice verifies its template against its own agent-browser driver.
@@ -130,6 +134,7 @@ jobs:
       - name: Publish a release on the fork
         env:
           GH_TOKEN: ${{ github.token }}
+          APP_VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
           short="${GITHUB_SHA::10}"
@@ -137,8 +142,11 @@ jobs:
           cat > notes.md <<EOF
           Patched Orca for macOS, built from \`$short\` on \`$GITHUB_REF_NAME\`.
 
-          Adds task groups with folders, the worktree chevron, child folders as projects, and the
-          Windows Claude model-list fix on top of upstream main.
+          On top of upstream main: task groups with folders (New Conversation opens a chat in the group's
+          folder and files it under the group, groups listed above standalone sessions), a + on each
+          workspace's title row for standalone sessions, the tab bar's + filing into your task group with
+          an "Add to" picker, the worktree chevron, child folders as projects, and the Windows Claude
+          model-list fix.
 
           **Easiest install (Apple Silicon):** paste this into Terminal. It downloads, installs and opens Orca:
 
@@ -154,7 +162,13 @@ jobs:
           xattr -dr com.apple.quarantine /Applications/Orca.app
           \`\`\`
 
-          It replaces an official Orca install and does not auto-update.
+          It replaces an official Orca install.
+
+          **Check you are running this build:** Orca menu, About Orca should show version \`$APP_VERSION\`.
+          A plain version such as 1.4.272 means the official app is open instead.
+
+          **Ignore Orca's update prompts:** this build reports an older base version, so Orca offers the
+          official release as an update; accepting it replaces this build and its features.
           EOF
           ls installers/*x64* >/dev/null 2>&1 || echo "No Intel (x64) build this time: its packaging self-test failed on the runner." >> notes.md
           sed -i 's/^          //' notes.md
