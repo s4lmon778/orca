@@ -23,3 +23,15 @@ export function agentRowTabIdFromEvent(target: EventTarget | null): string | nul
   }
   return target.closest(`[${AGENT_ROW_TAB_ID_ATTR}]`)?.getAttribute(AGENT_ROW_TAB_ID_ATTR) ?? null
 }
+
+/** Attribute naming the closed chat a dimmed sidebar row stands for. */
+export const CLOSED_CHAT_SESSION_ATTR = 'data-closed-chat-session'
+
+export function closedChatSessionIdFromEvent(target: EventTarget | null): string | null {
+  if (!(target instanceof Element)) {
+    return null
+  }
+  return (
+    target.closest(`[${CLOSED_CHAT_SESSION_ATTR}]`)?.getAttribute(CLOSED_CHAT_SESSION_ATTR) ?? null
+  )
+}

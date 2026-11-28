@@ -1,4 +1,5 @@
 import { editorTabRetirement } from '../editor/tabs/editor-tab-retirement'
+import { rememberClosedChatTab } from '../ui/sidebar-closed-chat-capture'
 import { structuredAgentSessionAddressTabId } from '../../../../../shared/agent-session/view/structured-agent-session-projection'
 import {
   landsOnEmptiedWorktree,
@@ -89,6 +90,10 @@ export function createTabsCloseActions(
         const target = structuredAgentSessionTargetForTab(state, tab)
         if (!tab.executionHostId || !target) {
           retireStructuredAgentSessionReadOwner(tab.entityId, null, tab.executionHostId ?? '')
+        }
+        if (target && !provisional && !opts?.preserveWorktreeSelection) {
+          // A chat the user closes stays listed, dimmed, so it can be reopened from the sidebar.
+          rememberClosedChatTab(state, worktreeId, tab)
         }
         if (target) {
           if (provisional) {

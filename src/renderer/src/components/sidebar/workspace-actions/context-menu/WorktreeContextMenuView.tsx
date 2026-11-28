@@ -21,7 +21,10 @@ import { WorktreeWslHostStartMenuItem } from '../../workspace-card/host/Worktree
 import { WorktreeContextMenuOverlays } from './WorktreeContextMenuOverlays'
 import { WorktreeNotificationMuteMenuItem } from './WorktreeNotificationMuteMenuItem'
 import { AgentTaskGroupMenuItems } from '../../workspace-card/task-groups/AgentTaskGroupMenuItems'
-import { agentRowTabIdFromEvent } from '../../workspace-card/task-groups/agent-task-group-workspace-key'
+import {
+  agentRowTabIdFromEvent,
+  closedChatSessionIdFromEvent
+} from '../../workspace-card/task-groups/agent-task-group-workspace-key'
 import { WslMovedWorkspaceUseHereMenuItem } from '@/components/wsl-move/WslMovedUseHereMenuItem'
 import { WslMoveFolderWorkspaceMenuItem } from '@/components/wsl-move/WslMoveProjectMenuItem'
 import { WorktreeContextMenuDeleteItems } from './WorktreeContextMenuDeleteItems'
@@ -87,6 +90,7 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
   const portalScope = useId()
   const [openedFromAgentRow, setOpenedFromAgentRow] = useState(false)
   const [agentRowTabId, setAgentRowTabId] = useState<string | null>(null)
+  const [closedChatSessionId, setClosedChatSessionId] = useState<string | null>(null)
   const sleepItems = (
     <WorkspaceSleepMenuItems
       isMultiContext={isMultiContext}
@@ -106,6 +110,7 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
     const fromAgentRow = fromPortal || isFromWorkspaceAgentRow(event.currentTarget, event.target)
     setOpenedFromAgentRow(fromAgentRow)
     setAgentRowTabId(fromAgentRow ? agentRowTabIdFromEvent(event.target) : null)
+    setClosedChatSessionId(fromAgentRow ? closedChatSessionIdFromEvent(event.target) : null)
     setContextWorktrees(
       fromPortal ? [worktree] : (onContextMenuSelect?.(event) ?? effectiveSelectedWorktrees)
     )
@@ -211,6 +216,7 @@ export default function WorktreeContextMenuView({ model }: { model: WorktreeCont
               worktreeId={worktree.id}
               executionHostId={worktree.hostId}
               agentTabId={agentRowTabId}
+              closedChatSessionId={closedChatSessionId}
               disabled={isDeleting}
             />
           )}

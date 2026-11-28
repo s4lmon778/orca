@@ -11,6 +11,10 @@ import {
   type AgentTaskGroupsByWorkspace,
   type WorkspaceAgentTaskGroups
 } from '../../../../../shared/agent-task-groups/agent-task-groups'
+import {
+  forgetSidebarClosedChat,
+  rememberSidebarClosedChat
+} from '../../../../../shared/agent-task-groups/sidebar-closed-chats'
 import { createNonSecureContextUuid } from '../../../../../shared/identifiers/non-secure-context-uuid'
 import {
   getExecutionHostIdFromWorktreeHostIdentity,
@@ -31,6 +35,8 @@ type AgentTaskGroupActions = Pick<
   | 'moveAgentTaskGroup'
   | 'setAgentTaskGroupCollapsed'
   | 'assignTabToAgentTaskGroup'
+  | 'rememberSidebarClosedChat'
+  | 'forgetSidebarClosedChat'
 >
 
 export function createAgentTaskGroupActions(
@@ -133,6 +139,12 @@ export function createAgentTaskGroupActions(
     },
     assignTabToAgentTaskGroup: (workspaceKey, tabId, groupId) => {
       apply(workspaceKey, (state) => assignTabToAgentTaskGroup(state, workspaceKey, tabId, groupId))
+    },
+    rememberSidebarClosedChat: (workspaceKey, chat) => {
+      apply(workspaceKey, (state) => rememberSidebarClosedChat(state, workspaceKey, chat))
+    },
+    forgetSidebarClosedChat: (workspaceKey, sessionId) => {
+      apply(workspaceKey, (state) => forgetSidebarClosedChat(state, workspaceKey, sessionId))
     }
   }
 }

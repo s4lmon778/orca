@@ -14,6 +14,9 @@ import { resolveTaskGroupLaunchTarget } from './agent-task-group-launch-target'
 
 const BRANCH_VALUE = '__branch__'
 
+/** Picking a destination is the step before picking the agent, so the + menu stays open for it. */
+const keepMenuOpen = (event: Event): void => event.preventDefault()
+
 /** In the tab bar's + menu: which task group (or none) the agent sessions it starts are filed in. */
 export function AgentTaskGroupDestinationMenu({
   worktreeId
@@ -53,9 +56,11 @@ export function AgentTaskGroupDestinationMenu({
               )
             }}
           >
-            <DropdownMenuRadioItem value={BRANCH_VALUE}>{branchLabel}</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value={BRANCH_VALUE} onSelect={keepMenuOpen}>
+              {branchLabel}
+            </DropdownMenuRadioItem>
             {groups.map((group) => (
-              <DropdownMenuRadioItem key={group.id} value={group.id}>
+              <DropdownMenuRadioItem key={group.id} value={group.id} onSelect={keepMenuOpen}>
                 {group.name}
               </DropdownMenuRadioItem>
             ))}

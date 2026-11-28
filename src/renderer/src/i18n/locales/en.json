@@ -8594,7 +8594,8 @@
         "AgentTaskGroupMenuItems": {
           "newGroup": "New Task Group…",
           "moveTo": "Move to Task Group",
-          "ungroup": "Remove from Group"
+          "ungroup": "Remove from Group",
+          "removeFromSidebar": "Remove from Sidebar"
         },
         "AgentTaskGroupSection": {
           "newConversation": "New Conversation",
@@ -8632,6 +8633,11 @@
         "AgentTaskGroupDestinationMenu": {
           "branch": "No task group",
           "addTo": "Add to: {{value0}}"
+        },
+        "SidebarClosedChatRow": {
+          "reopen": "Reopen {{title}}",
+          "remove": "Remove from Sidebar",
+          "reopenFailed": "Could not reopen this chat."
         }
       },
       "shared": {

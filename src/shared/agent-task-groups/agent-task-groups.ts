@@ -1,3 +1,10 @@
+import {
+  isAgentTaskGroupRecord as isRecord,
+  isAgentTaskGroupId as isId,
+  normalizeSidebarClosedChats,
+  type SidebarClosedChat
+} from './sidebar-closed-chat-record'
+
 /**
  * Task groups organize a workspace's agent conversations in the sidebar. A group owns no branch,
  * worktree, process, or transcript; its optional folder only sets where new conversations start.
@@ -18,6 +25,8 @@ export type WorkspaceAgentTaskGroups = {
   groupIdByTabId: Record<string, string>
   /** The workspace card folds its whole conversation list. */
   listCollapsed?: true
+  /** Chats whose tab was closed; they stay in the list, dimmed, until reopened or removed. */
+  closedChats?: SidebarClosedChat[]
 }
 
 /** Keyed by host-qualified workspace identity, so local and remote copies of a workspace stay apart. */
@@ -27,7 +36,6 @@ export const MAX_AGENT_TASK_GROUP_WORKSPACES = 1000
 export const MAX_AGENT_TASK_GROUPS_PER_WORKSPACE = 64
 export const MAX_AGENT_TASK_GROUP_MEMBERS_PER_WORKSPACE = 2000
 export const MAX_AGENT_TASK_GROUP_NAME_LENGTH = 120
-const MAX_ID_LENGTH = 512
 const MAX_FOLDER_PATH_LENGTH = 4096
 
 export function normalizeAgentTaskGroupFolderPath(value: unknown): string | null {
@@ -36,14 +44,6 @@ export function normalizeAgentTaskGroupFolderPath(value: unknown): string | null
   }
   const path = value.trim()
   return path.length > 0 && path.length <= MAX_FOLDER_PATH_LENGTH ? path : null
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function isId(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH
 }
 
 export function normalizeAgentTaskGroupName(value: unknown): string | null {
@@ -56,12 +56,13 @@ export function normalizeAgentTaskGroupName(value: unknown): string | null {
 
 /** One workspace's groups as stored with the workspace on its host; null when none survive. */
 export function normalizeWorkspaceAgentTaskGroups(value: unknown): WorkspaceAgentTaskGroups | null {
-  if (!isRecord(value) || !Array.isArray(value.groups)) {
+  if (!isRecord(value)) {
     return null
   }
+  const closedChats = normalizeSidebarClosedChats(value.closedChats)
   const groups: AgentTaskGroup[] = []
   const ids = new Set<string>()
-  for (const raw of value.groups) {
+  for (const raw of Array.isArray(value.groups) ? value.groups : []) {
     if (groups.length >= MAX_AGENT_TASK_GROUPS_PER_WORKSPACE) {
       break
     }
@@ -83,7 +84,7 @@ export function normalizeWorkspaceAgentTaskGroups(value: unknown): WorkspaceAgen
       ...(folderPath ? { folderPath } : {})
     })
   }
-  if (groups.length === 0) {
+  if (groups.length === 0 && closedChats.length === 0) {
     return null
   }
   const groupIdByTabId: Record<string, string> = {}
@@ -103,7 +104,8 @@ export function normalizeWorkspaceAgentTaskGroups(value: unknown): WorkspaceAgen
   return {
     groups,
     groupIdByTabId,
-    ...(value.listCollapsed === true ? { listCollapsed: true } : {})
+    ...(value.listCollapsed === true && groups.length > 0 ? { listCollapsed: true } : {}),
+    ...(closedChats.length > 0 ? { closedChats } : {})
   }
 }
 
@@ -127,7 +129,8 @@ export function normalizeAgentTaskGroupsByWorkspace(value: unknown): AgentTaskGr
   return result
 }
 
-function updateWorkspace(
+/** Applies one workspace's update; a record left with nothing to show is dropped. */
+export function updateWorkspaceAgentTaskGroups(
   state: AgentTaskGroupsByWorkspace,
   workspaceKey: string,
   update: (current: WorkspaceAgentTaskGroups) => WorkspaceAgentTaskGroups | null
@@ -138,7 +141,7 @@ function updateWorkspace(
     return state
   }
   const result = { ...state }
-  if (!next || next.groups.length === 0) {
+  if (!next || (next.groups.length === 0 && (next.closedChats?.length ?? 0) === 0)) {
     delete result[workspaceKey]
   } else {
     result[workspaceKey] = next
@@ -160,7 +163,7 @@ export function createAgentTaskGroup(
   ) {
     return state
   }
-  return updateWorkspace(state, workspaceKey, (current) =>
+  return updateWorkspaceAgentTaskGroups(state, workspaceKey, (current) =>
     !name ||
     !isId(group.id) ||
     current.groups.length >= MAX_AGENT_TASK_GROUPS_PER_WORKSPACE ||
@@ -187,7 +190,7 @@ function mapGroup(
   groupId: string,
   map: (group: AgentTaskGroup) => AgentTaskGroup
 ): AgentTaskGroupsByWorkspace {
-  return updateWorkspace(state, workspaceKey, (current) => {
+  return updateWorkspaceAgentTaskGroups(state, workspaceKey, (current) => {
     const index = current.groups.findIndex((group) => group.id === groupId)
     if (index === -1) {
       return current
@@ -236,7 +239,7 @@ export function setAgentTaskGroupsListCollapsed(
   workspaceKey: string,
   collapsed: boolean
 ): AgentTaskGroupsByWorkspace {
-  return updateWorkspace(state, workspaceKey, (current) => {
+  return updateWorkspaceAgentTaskGroups(state, workspaceKey, (current) => {
     if (current.groups.length === 0 || Boolean(current.listCollapsed) === collapsed) {
       return current
     }
@@ -266,7 +269,7 @@ export function moveAgentTaskGroup(
   groupId: string,
   offset: -1 | 1
 ): AgentTaskGroupsByWorkspace {
-  return updateWorkspace(state, workspaceKey, (current) => {
+  return updateWorkspaceAgentTaskGroups(state, workspaceKey, (current) => {
     const index = current.groups.findIndex((group) => group.id === groupId)
     const target = index + offset
     if (index === -1 || target < 0 || target >= current.groups.length) {
@@ -284,7 +287,7 @@ export function deleteAgentTaskGroup(
   workspaceKey: string,
   groupId: string
 ): AgentTaskGroupsByWorkspace {
-  return updateWorkspace(state, workspaceKey, (current) => {
+  return updateWorkspaceAgentTaskGroups(state, workspaceKey, (current) => {
     if (!current.groups.some((group) => group.id === groupId)) {
       return current
     }
@@ -309,7 +312,7 @@ export function assignTabToAgentTaskGroup(
   tabId: string,
   groupId: string | null
 ): AgentTaskGroupsByWorkspace {
-  return updateWorkspace(state, workspaceKey, (current) => {
+  return updateWorkspaceAgentTaskGroups(state, workspaceKey, (current) => {
     if (!isId(tabId) || (current.groupIdByTabId[tabId] ?? null) === groupId) {
       return current
     }

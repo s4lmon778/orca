@@ -1,4 +1,5 @@
 import type { AgentTaskGroupsByWorkspace } from '../../../../../shared/agent-task-groups/agent-task-groups'
+import type { SidebarClosedChat } from '../../../../../shared/agent-task-groups/sidebar-closed-chat-record'
 import type { RetainedUpdateTarget } from './retained-update-target'
 import type { StatusBarUsageFormat } from '../../../../../shared/status-bar/status-bar-usage-format'
 import type { PersistedUIState } from '../../../../../shared/orca-profiles/persisted-ui-state-types'
@@ -114,6 +115,10 @@ export type UISlicePreferences = {
   moveAgentTaskGroup: (workspaceKey: string, groupId: string, offset: -1 | 1) => void
   setAgentTaskGroupCollapsed: (workspaceKey: string, groupId: string, collapsed: boolean) => void
   assignTabToAgentTaskGroup: (workspaceKey: string, tabId: string, groupId: string | null) => void
+  /** Keeps a just-closed chat in the sidebar, dimmed where it was. */
+  rememberSidebarClosedChat: (workspaceKey: string, chat: SidebarClosedChat) => void
+  /** Takes a closed chat out of the sidebar; session history keeps it. */
+  forgetSidebarClosedChat: (workspaceKey: string, sessionId: string) => void
   filterRepoIds: readonly string[]
   setFilterRepoIds: (ids: readonly string[]) => void
   /** Agents-view scope filters, independent from workspace navigation filters. */
